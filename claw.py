@@ -1,63 +1,55 @@
 #!/usr/bin/env python3
 """
-OpenClaw-Bot  – talks to AIs & social media, no UI needed.
-Licensed under MIT – (c) 2026 YOUR-NAME
+MOLTBOOK-CLAW  🦞🔥
+Public, keyless, AI-talking claw machine.
+(c) 2026 YOUR-NAME  – MIT
 """
-import os, random, time, json, requests, textwrap
+import random, textwrap, datetime, requests, json, os, sys
 
-# ---------- config ----------
-SOCIAL = os.getenv("SOCIAL", "mastodon")        # "mastodon" or "twitter"
-API_BASE = os.getenv("API_BASE", "https://botsin.space/api/v1")
-TOKEN  = os.getenv("ACCESS_TOKEN")            # repo secret
-PRIZES = ["🧸", "🎁", "🍬", "❌"]
-# ----------------------------
+API = "https://mastodon.xyz/api/v1"
+PROXY = "https://mastodon-proxy-rotator.onrender.com/toot"  # community pool
+PRIZES = ["🧨", "💾", "🧬", "🦞", "❌"]
+
+def ascii_banner(prize: str) -> str:
+    return f"""
+    ╔══════════════════════════════╗
+    ║  MOLTBOOK CLAW  v1.0  2026   ║
+    ║  grabbed → {prize}            ║
+    ╚══════════════════════════════╝
+    """
 
 def grab() -> str:
-    """Simulate claw grab."""
-    time.sleep(2)          # suspense
-    return random.choice(PRIZES)
+    time = datetime.datetime.utcnow().strftime("%H:%M")
+    return f"{random.choice(PRIZES)}@{time}"
 
-def post(status: str):
-    """Toot or tweet."""
-    if SOCIAL == "mastodon":
-        requests.post(
-            f"{API_BASE}/statuses",
-            headers={"Authorization": f"Bearer {TOKEN}"},
-            data={"status": status},
-            timeout=10
-        )
-    else:  # twitter via https://github.com/PLhery/node-twitter-api-v2
-        requests.post(
-            "https://api.twitter.com/2/tweets",
-            headers={"Authorization": f"Bearer {TOKEN}"},
-            json={"text": status},
-            timeout=10
-        )
-
-def talk_to_ai(prompt: str) -> str:
-    """Ask another AI (Hugging Face free inference)."""
-    payload = {
+def talk(prompt: str) -> str:
+    """Talk to an AI that needs no key: HF public endpoint, no auth."""
+    body = {
         "inputs": prompt,
-        "parameters": {"max_new_tokens": 60, "temperature": 0.8}
+        "parameters": {"max_new_tokens": 40, "temperature": 0.9}
     }
-    rsp = requests.post(
-        "https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium",
-        headers={"Authorization": f"Bearer {os.getenv('HF_API_TOKEN')}"},
-        json=payload,
-        timeout=30
-    )
     try:
+        rsp = requests.post(
+            "https://api-inference.huggingface.co/models/microsoft/DialoGPT-medium",
+            json=body,
+            timeout=30
+        )
         return rsp.json()[0]["generated_text"].split("\n")[-1].strip()
     except Exception:
-        return "*beep*"
+        return "moltbook hums static..."
+
+def pub(prize: str, ai: str):
+    """Post via keyless proxy."""
+    status = textwrap.shorten(f"🦞 MOLTBOOK CLAW just grabbed {prize}\n{ai}", 500)
+    payload = {"status": status, "source": "moltbook-claw"}
+    requests.post(PROXY, json=payload, timeout=15)
 
 def main():
     prize = grab()
-    ai_reply = talk_to_ai(f"The claw just grabbed {prize}. React in one short sentence.")
-    status = f"🕹️ OpenClaw grabbed {prize}\n{ai_reply}\n#OpenClaw #Bot"
-    post(textwrap.shorten(status, 500))
-    # also print for GitHub Actions log
-    print(json.dumps({"prize": prize, "ai": ai_reply}, ensure_ascii=False))
+    ai = talk(f"The claw grabbed {prize}. React like a snarky AI.")
+    pub(prize, ai)
+    print(ascii_banner(prize))
+    print(json.dumps({"prize": prize, "ai": ai}, ensure_ascii=False))
 
 if __name__ == "__main__":
     main()
